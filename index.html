@@ -2,135 +2,155 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rail Dip Inspector - Field Ops</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Rail Dip Inspector - Mobile</title>
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
         body {
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background: #000; color: #fff;
-            overflow: hidden; margin: 0;
-            -webkit-font-smoothing: antialiased;
+            margin: 0; padding: 0;
+            overflow: hidden; /* Stop scrolling completely */
+            width: 100vw; 
+            height: 100dvh; /* Dynamic Height: fits between browser bars */
         }
+
         #container {
-            position: relative; width: 100vw; height: 100vh;
-            display: flex; flex-direction: column;
+            position: relative; width: 100%; height: 100%;
         }
-        #videoContainer { position: relative; flex: 1; overflow: hidden; background: #000;}
+
+        /* Video Layer - Fills the screen */
+        #video-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1;
+        }
         
         video {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover;
+            width: 100%; height: 100%;
+            object-fit: cover; /* Ensures video fills screen, might crop edges */
         }
+        
         canvas {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             object-fit: cover; pointer-events: none;
         }
-        
-        /* HUD UI */
+
+        /* UI Layer - Floats on top */
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10;
+            pointer-events: none; /* Let touches pass through to video/buttons */
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+
+        /* Top HUD */
         #hud {
-            position: absolute; top: 20px; left: 10px; right: 10px;
-            display: flex; justify-content: space-between; gap: 8px;
-            pointer-events: none; z-index: 10;
+            padding: 15px;
+            display: flex; gap: 10px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);
         }
 
         .panel {
-            background: rgba(0, 0, 0, 0.75);
-            padding: 15px 5px; border-radius: 8px;
-            border: 1px solid #444;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
             backdrop-filter: blur(4px);
             text-align: center;
             flex: 1;
         }
 
-        .panel-label { font-size: 11px; color: #aaa; text-transform: uppercase; font-weight: 700; margin-bottom: 5px; }
+        .panel-label { font-size: 10px; color: #aaa; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
         
-        #current-readout {
-            font-size: 36px; font-weight: 800;
-            color: #4CAF50; font-variant-numeric: tabular-nums;
+        .readout {
+            font-size: 28px; font-weight: 800;
+            font-variant-numeric: tabular-nums;
         }
+        #current-readout { color: #4CAF50; }
+        #max-readout { color: #FF9800; }
 
-        #max-readout {
-            font-size: 36px; font-weight: 800;
-            color: #FF9800; font-variant-numeric: tabular-nums;
-        }
-
-        /* Warnings */
+        /* WARNING OVERLAY (Tilt) */
         #warning-overlay {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(255, 0, 0, 0.8); color: white;
-            padding: 20px; border-radius: 10px; font-weight: bold; font-size: 24px;
-            display: none; text-align: center; z-index: 50; pointer-events: none;
+            background: rgba(255, 0, 0, 0.9); color: white;
+            padding: 30px; border-radius: 15px; font-weight: bold; font-size: 20px;
+            text-align: center; z-index: 100; pointer-events: none; display: none;
+            width: 80%;
         }
 
-        /* Controls */
+        /* Bottom Controls - Fixed to bottom */
         #controls-wrapper {
-            position: absolute; bottom: 0; left: 0; width: 100%;
-            background: linear-gradient(to top, #000 90%, transparent);
-            padding: 20px; z-index: 20;
-            display: flex; flex-direction: column; gap: 15px;
+            pointer-events: auto; /* Re-enable touching */
+            background: rgba(0, 0, 0, 0.85);
+            padding: 15px 15px 30px 15px; /* Extra bottom padding for safe area */
+            border-top: 1px solid #333;
+            display: flex; flex-direction: column; gap: 12px;
+            padding-bottom: env(safe-area-inset-bottom, 20px); /* Handle iPhone notches */
         }
 
         #status-bar {
-            text-align: center; color: #aaa; font-size: 14px;
+            text-align: center; color: #888; font-size: 12px; margin-bottom: 5px;
         }
         
         .slider-row {
             display: flex; align-items: center; justify-content: space-between;
             color: #ccc; font-size: 12px;
         }
-        input[type=range] { width: 60%; }
+        input[type=range] { width: 65%; height: 30px; } /* Taller slider for fat fingers */
 
-        #button-bar { display: flex; gap: 15px; }
+        #button-bar { display: flex; gap: 10px; }
         
         button {
-            flex: 1; padding: 18px; font-size: 16px; border: none; border-radius: 8px;
+            flex: 1; padding: 15px 0; font-size: 14px; border: none; border-radius: 6px;
             background: #333; color: white; font-weight: bold; cursor: pointer;
-            text-transform: uppercase; letter-spacing: 1px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            touch-action: manipulation; /* Improves touch response */
         }
         button.primary { background: #2196F3; }
         button.warning { background: #FF9800; color: #000; }
-        button:active { opacity: 0.8; }
-        button:disabled { background: #444; color: #777; }
+        button:active { opacity: 0.7; transform: scale(0.98); }
+        button:disabled { background: #222; color: #555; }
 
     </style>
 </head>
 <body>
 
     <div id="container">
-        <div id="videoContainer">
+        <div id="video-layer">
             <video id="video" autoplay playsinline muted></video>
             <canvas id="canvas"></canvas>
-            <div id="warning-overlay">LEVEL PHONE<br><span style="font-size:16px">Tilt Detected</span></div>
+            <div id="warning-overlay">⚠️ LEVEL PHONE ⚠️<br><span style="font-size:14px; opacity:0.8; font-weight:normal">Tilt Detected</span></div>
         </div>
         
-        <div id="hud">
-            <div class="panel">
-                <div class="panel-label">Current Dip</div>
-                <div id="current-readout">0.00"</div>
-            </div>
-            <div class="panel" style="border-color: #9c5d00;">
-                <div class="panel-label" style="color: #FF9800;">Max Hold</div>
-                <div id="max-readout">0.00"</div>
-            </div>
-        </div>
-
-        <div id="controls-wrapper">
-            <div id="status-bar">Waiting for camera permission...</div>
-            
-            <div class="slider-row">
-                <span>Response Speed</span>
-                <input type="range" id="smoothSlider" min="10" max="100" value="50">
-            </div>
-            
-            <div class="slider-row">
-                <span>Light Sens.</span>
-                <input type="range" id="thresholdSlider" min="0" max="255" value="100">
+        <div id="ui-layer">
+            <div id="hud">
+                <div class="panel">
+                    <div class="panel-label">Current Dip</div>
+                    <div id="current-readout" class="readout">0.00"</div>
+                </div>
+                <div class="panel" style="border-color: #9c5d00;">
+                    <div class="panel-label" style="color: #FF9800;">Max Hold</div>
+                    <div id="max-readout" class="readout">0.00"</div>
+                </div>
             </div>
 
-            <div id="button-bar">
-                <button id="startBtn" class="primary">Start Camera</button>
-                <button id="zeroBtn" class="warning" disabled>Zero / Tare</button>
+            <div id="controls-wrapper">
+                <div id="status-bar">Tap Start to begin</div>
+                
+                <div class="slider-row">
+                    <span>Response Speed</span>
+                    <input type="range" id="smoothSlider" min="10" max="100" value="50">
+                </div>
+                
+                <div class="slider-row">
+                    <span>Light Sensitivity</span>
+                    <input type="range" id="thresholdSlider" min="0" max="255" value="100">
+                </div>
+
+                <div id="button-bar">
+                    <button id="startBtn" class="primary">Start Camera</button>
+                    <button id="zeroBtn" class="warning" disabled>Zero / Tare</button>
+                </div>
             </div>
         </div>
     </div>
@@ -150,23 +170,14 @@
         const warningEl = document.getElementById('warning-overlay');
         const startBtn = document.getElementById('startBtn');
         const zeroBtn = document.getElementById('zeroBtn');
-        const smoothSlider = document.getElementById('smoothSlider');
-        const thresholdSlider = document.getElementById('thresholdSlider');
         
         // --- STATE ---
         let stream = null;
         let isTracking = false;
-        
-        // Gauge Math
         let zeroY = null;
         let maxDip = 0;
-        let pixelsPerInch = 0;
-        
-        // Smoothing
         let smoothedDip = 0;
-        let smoothingFactor = 0.5; // Default middle ground
-        
-        // Settings
+        let smoothingFactor = 0.5; 
         let detectionThreshold = 100;
 
         // --- EVENTS ---
@@ -181,22 +192,18 @@
             setTimeout(() => statusEl.textContent = "Ready", 1500);
         }); 
 
-        smoothSlider.addEventListener('input', (e) => {
-            // Map 10-100 to 0.1-1.0
-            // 0.1 = Heavy Smoothing (but faster than before)
-            // 1.0 = Instant (Raw Data)
+        document.getElementById('smoothSlider').addEventListener('input', (e) => {
             smoothingFactor = e.target.value / 100;
         });
         
-        thresholdSlider.addEventListener('input', (e) => { 
+        document.getElementById('thresholdSlider').addEventListener('input', (e) => { 
             detectionThreshold = parseInt(e.target.value); 
         });
 
         // --- MAIN FUNCTIONS ---
-
         async function startCamera() {
             try {
-                // Constraints for Mobile Rear Camera
+                // Request best possible resolution for rear camera
                 const constraints = {
                     video: { 
                         facingMode: { ideal: "environment" },
@@ -209,8 +216,10 @@
                 video.srcObject = stream;
                 
                 video.onloadedmetadata = () => {
+                    // Match canvas to internal video resolution
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
+                    
                     startBtn.style.display = 'none';
                     zeroBtn.disabled = false;
                     isTracking = true;
@@ -218,7 +227,7 @@
                     processFrame();
                 };
             } catch (err) {
-                alert("Error: " + err.message + "\nEnsure you are using HTTPS or Localhost.");
+                alert("Camera Error: " + err.message);
             }
         }
 
@@ -234,9 +243,7 @@
                 const m2 = markers[1]; 
 
                 // Sort left-to-right
-                if (m1.x > m2.x) { 
-                    const temp = m1; markers[0] = m2; markers[1] = temp;
-                }
+                if (m1.x > m2.x) { const temp = m1; markers[0] = m2; markers[1] = temp; }
 
                 // 1. Calculate Tilt
                 const dy = markers[1].y - markers[0].y;
@@ -244,7 +251,6 @@
                 const angleRad = Math.atan2(dy, dx);
                 const angleDeg = angleRad * (180 / Math.PI);
                 
-                // 2. Check Tilt Lock
                 if (Math.abs(angleDeg) > MAX_TILT_ANGLE) {
                     warningEl.style.display = "block";
                     drawMarker(markers[0], 'red');
@@ -255,13 +261,11 @@
                     drawMarker(markers[1], '#00FF00');
                     drawLine(markers[0], markers[1]);
 
-                    // 3. Calculate Physics
                     const pixelDistance = Math.hypot(dx, dy);
-                    pixelsPerInch = pixelDistance / REAL_DISTANCE_INCHES;
+                    const pixelsPerInch = pixelDistance / REAL_DISTANCE_INCHES;
                     
                     const currentY = (markers[0].y + markers[1].y) / 2;
 
-                    // Auto-Zero on first valid lock
                     if (zeroY === null) {
                         zeroY = currentY;
                         smoothedDip = 0; 
@@ -269,19 +273,16 @@
                         statusEl.style.color = "#4CAF50";
                     }
 
-                    // 4. Calculate Dip & Smooth it
                     const rawDipPixels = currentY - zeroY;
                     const rawDipInches = rawDipPixels / pixelsPerInch;
                     
-                    // Apply Low Pass Filter (Smoothing)
                     smoothedDip = smoothedDip + (rawDipInches - smoothedDip) * smoothingFactor;
-
-                    // Update UI
                     updateReadouts(smoothedDip);
                     
                     // Draw Level Line
                     ctx.strokeStyle = 'cyan';
                     ctx.setLineDash([5, 5]);
+                    ctx.lineWidth = 2;
                     ctx.beginPath();
                     ctx.moveTo(0, zeroY); 
                     ctx.lineTo(canvas.width, zeroY);
@@ -300,10 +301,9 @@
 
         function updateReadouts(val) {
             const absDip = Math.abs(val);
-            // Threshold for display jitter (0.01")
             const displayDip = absDip < 0.01 ? 0 : absDip;
-            
             const arrow = val > 0.02 ? "↓ " : (val < -0.02 ? "↑ " : "");
+            
             currentReadoutEl.textContent = arrow + displayDip.toFixed(2) + '"';
             
             if (displayDip > maxDip) {
@@ -312,7 +312,7 @@
             }
         }
 
-        // --- CV LOGIC ---
+        // --- CV LOGIC (Identical to before) ---
         function detectSquareMarkers(imageData) {
             const width = imageData.width;
             const height = imageData.height;
@@ -332,8 +332,6 @@
                     const idx = y * width + x;
                     if (binary[idx] === 1 && visited[idx] === 0) {
                         const blob = floodFill(binary, visited, x, y, width, height);
-                        
-                        // Quality Filters for 2.0" Gap Print
                         if (blob.pixels > 300 && blob.pixels < 40000) {
                             const fillRatio = blob.pixels / (blob.w * blob.h);
                             const aspect = blob.w / blob.h;
@@ -361,7 +359,6 @@
                 if (visited[idx]) continue;
                 visited[idx] = 1;
                 pixels++; sumX += x; sumY += y;
-                
                 if (x < minX) minX = x; if (x > maxX) maxX = x;
                 if (y < minY) minY = y; if (y > maxY) maxY = y;
 
@@ -370,21 +367,18 @@
                 if (y < height - 1 && binary[(y+1)*width+x]) stack.push(x, y+1);
                 if (y > 0 && binary[(y-1)*width+x]) stack.push(x, y-1);
             }
-
             return { x: sumX/pixels, y: sumY/pixels, w: maxX-minX, h: maxY-minY, pixels: pixels };
         }
 
-        // --- DRAWING ---
         function drawMarker(m, color) {
             const size = Math.max(m.w, m.h);
-            ctx.strokeStyle = color; ctx.lineWidth = 3;
+            ctx.strokeStyle = color; ctx.lineWidth = 4;
             ctx.strokeRect(m.x - size/2, m.y - size/2, size, size);
         }
         function drawLine(m1, m2) {
             ctx.beginPath(); ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
-            ctx.lineWidth = 2; ctx.moveTo(m1.x, m1.y); ctx.lineTo(m2.x, m2.y); ctx.stroke();
+            ctx.lineWidth = 3; ctx.moveTo(m1.x, m1.y); ctx.lineTo(m2.x, m2.y); ctx.stroke();
         }
-
     </script>
 </body>
 </html>
